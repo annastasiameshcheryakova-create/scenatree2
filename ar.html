@@ -8,43 +8,27 @@
   <style>
     html, body {
       margin: 0;
-      width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: Arial, sans-serif;
-      background: #000;
+      background: black;
     }
 
     #container {
       width: 100vw;
       height: 100vh;
       position: relative;
-      overflow: hidden;
     }
 
-    .info {
+    .text {
       position: absolute;
-      top: 16px;
-      left: 16px;
+      top: 15px;
+      left: 15px;
       z-index: 10;
-      background: rgba(0,0,0,0.55);
       color: white;
-      padding: 12px 16px;
-      border-radius: 14px;
-      line-height: 1.5;
-      max-width: 320px;
-    }
-
-    .back {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      z-index: 10;
-      background: rgba(0,0,0,0.55);
-      color: white;
-      padding: 10px 14px;
-      border-radius: 12px;
-      text-decoration: none;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 10px;
+      font-family: Arial;
     }
   </style>
 
@@ -52,21 +36,18 @@
   {
     "imports": {
       "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
       "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
     }
   }
   </script>
 </head>
 <body>
-  <div id="container">
-    <div class="info">
-      Наведіть камеру на ваш маркер.<br />
-      Після розпізнавання з’являться 3 геометрії Three.js.
-    </div>
-    <a class="back" href="index.html">На головну</a>
-  </div>
 
-  <script type="module" src="main.js"></script>
+<div id="container">
+  <div class="text">Наведи камеру на котика 🐱</div>
+</div>
+
+<script type="module" src="main.js"></script>
+
 </body>
 </html>
