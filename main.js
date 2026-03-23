@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { MindARThree } from "mindar-image-three";
 
+const container = document.querySelector("#container");
 const startButton = document.querySelector("#startButton");
 const stopButton = document.querySelector("#stopButton");
-const statusBox = document.querySelector("#status");
-const container = document.querySelector("#container");
+const statusEl = document.querySelector("#status");
+const markerStatusEl = document.querySelector("#markerStatus");
 
 let mindarThree = null;
 let renderer = null;
@@ -12,30 +13,66 @@ let scene = null;
 let camera = null;
 let anchor = null;
 let started = false;
-let assetVideo = null;
+let video = null;
+
 let cube = null;
 let sphere = null;
 let cone = null;
+let plane = null;
 
 function setStatus(text) {
-  statusBox.textContent = text;
+  statusEl.textContent = text;
 }
 
-function createSceneObjects() {
-  assetVideo = document.createElement("video");
-  assetVideo.src = "./kitty.mp4";
-  assetVideo.loop = true;
-  assetVideo.muted = true;
-  assetVideo.playsInline = true;
-  assetVideo.crossOrigin = "anonymous";
-  assetVideo.setAttribute("playsinline", "");
-  assetVideo.setAttribute("webkit-playsinline", "");
+function setMarkerStatus(text) {
+  markerStatusEl.textContent = text;
+}
 
-  const videoTexture = new THREE.VideoTexture(assetVideo);
+async function checkFile(url) {
+  const response = await fetch(url, { method: "GET" });
+  if (!response.ok) {
+    throw new Error(`Файл не знайдено: ${url}`);
+  }
+  return true;
+}
+
+async function initAR() {
+  setStatus("перевірка файлів...");
+
+  await checkFile("./targets/marker.mind");
+  await checkFile("./kitty.mp4");
+
+  setStatus("створення AR-сцени...");
+
+  mindarThree = new MindARThree({
+    container: container,
+    imageTargetSrc: "./targets/marker.mind",
+    uiScanning: true,
+    uiLoading: true,
+    uiError: true,
+  });
+
+  const result = mindarThree;
+  renderer = result.renderer;
+  scene = result.scene;
+  camera = result.camera;
+
+  anchor = mindarThree.addAnchor(0);
+
+  video = document.createElement("video");
+  video.src = "./kitty.mp4";
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.crossOrigin = "anonymous";
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+
+  const videoTexture = new THREE.VideoTexture(video);
   videoTexture.minFilter = THREE.LinearFilter;
   videoTexture.magFilter = THREE.LinearFilter;
 
-  const videoPlane = new THREE.Mesh(
+  plane = new THREE.Mesh(
     new THREE.PlaneGeometry(1.2, 0.8),
     new THREE.MeshBasicMaterial({
       map: videoTexture,
@@ -43,18 +80,18 @@ function createSceneObjects() {
       transparent: true
     })
   );
-  videoPlane.position.set(0, 0, 0);
-  anchor.group.add(videoPlane);
+  plane.position.set(0, 0, 0);
+  anchor.group.add(plane);
 
   cube = new THREE.Mesh(
-    new THREE.BoxGeometry(0.25, 0.25, 0.25),
+    new THREE.BoxGeometry(0.22, 0.22, 0.22),
     new THREE.MeshBasicMaterial({ color: 0xff0000 })
   );
-  cube.position.set(-0.72, 0, 0);
+  cube.position.set(-0.75, 0, 0);
   anchor.group.add(cube);
 
   sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 32, 32),
+    new THREE.SphereGeometry(0.17, 32, 32),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 })
   );
   sphere.position.set(0, 0.55, 0);
@@ -64,35 +101,29 @@ function createSceneObjects() {
     new THREE.ConeGeometry(0.17, 0.35, 32),
     new THREE.MeshBasicMaterial({ color: 0x0000ff })
   );
-  cone.position.set(0.72, 0, 0);
+  cone.position.set(0.75, 0, 0);
   anchor.group.add(cone);
 
+  // ВАЖНО: чтобы видеть, вообще ли работает якорь
+  anchor.group.visible = false;
+
   anchor.onTargetFound = async () => {
-    setStatus("Маркер знайдено");
+    setMarkerStatus("знайдено ✅");
+    anchor.group.visible = true;
+
     try {
-      await assetVideo.play();
+      await video.play();
     } catch (e) {
-      console.warn("Video play blocked:", e);
+      console.warn("video.play blocked", e);
     }
   };
 
   anchor.onTargetLost = () => {
-    setStatus("Маркер втрачено");
-    assetVideo.pause();
-    assetVideo.currentTime = 0;
+    setMarkerStatus("втрачено");
+    anchor.group.visible = false;
+    video.pause();
+    video.currentTime = 0;
   };
-}
-
-async function initAR() {
-  mindarThree = new MindARThree({
-    container,
-    imageTargetSrc: "./targets/marker.mind"
-  });
-
-  ({ renderer, scene, camera } = mindarThree);
-  anchor = mindarThree.addAnchor(0);
-
-  createSceneObjects();
 }
 
 async function startAR() {
@@ -100,17 +131,19 @@ async function startAR() {
 
   try {
     startButton.disabled = true;
-    setStatus("Запуск камери...");
+    setStatus("ініціалізація...");
+    setMarkerStatus("не знайдено");
 
     if (!mindarThree) {
       await initAR();
     }
 
+    setStatus("запуск камери...");
     await mindarThree.start();
-    started = true;
 
+    started = true;
     stopButton.disabled = false;
-    setStatus("Камера увімкнена. Наведи на маркер.");
+    setStatus("камера запущена, наведи на marker.png");
 
     renderer.setAnimationLoop(() => {
       if (cube) {
@@ -132,7 +165,7 @@ async function startAR() {
   } catch (error) {
     console.error(error);
     startButton.disabled = false;
-    setStatus("Не вдалося запустити камеру або AR");
+    setStatus(`помилка: ${error.message}`);
   }
 }
 
@@ -142,15 +175,16 @@ function stopAR() {
   mindarThree.stop();
   renderer.setAnimationLoop(null);
 
-  if (assetVideo) {
-    assetVideo.pause();
-    assetVideo.currentTime = 0;
+  if (video) {
+    video.pause();
+    video.currentTime = 0;
   }
 
   started = false;
   startButton.disabled = false;
   stopButton.disabled = true;
-  setStatus("AR зупинено");
+  setStatus("зупинено");
+  setMarkerStatus("не знайдено");
 }
 
 startButton.addEventListener("click", startAR);
