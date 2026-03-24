@@ -1,91 +1,80 @@
 import * as THREE from "three";
 import { MindARThree } from "mindar-image-three";
 
-const container = document.querySelector("#container");
-const startButton = document.querySelector("#startButton");
-const stopButton = document.querySelector("#stopButton");
-const statusEl = document.querySelector("#status");
-const markerStatusEl = document.querySelector("#markerStatus");
+const container = document.getElementById("container");
+const overlay = document.getElementById("overlay");
+const startBtn = document.getElementById("startBtn");
+const errorText = document.getElementById("errorText");
+const statusText = document.getElementById("status");
+const markerStatusText = document.getElementById("markerStatus");
+const cameraPreview = document.getElementById("cameraPreview");
 
+let previewStream = null;
 let mindarThree = null;
 let renderer = null;
 let scene = null;
 let camera = null;
 let anchor = null;
-let started = false;
 let assetVideo = null;
+
 let cube = null;
 let sphere = null;
 let cone = null;
-let plane = null;
-let previewStream = null;
 
 function setStatus(text) {
-  statusEl.textContent = text;
+  statusText.textContent = text;
 }
 
 function setMarkerStatus(text) {
-  markerStatusEl.textContent = text;
+  markerStatusText.textContent = text;
 }
 
-async function requestCameraLikeMeet() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    throw new Error("Браузер не підтримує getUserMedia.");
+async function checkFile(url) {
+  const response = await fetch(url, { method: "GET" });
+  if (!response.ok) {
+    throw new Error(`Не знайдено файл: ${url}`);
   }
+}
 
-  const constraints = {
-    audio: false,
+async function openCameraPreview() {
+  const stream = await navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: { ideal: "environment" },
       width: { ideal: 1280 },
       height: { ideal: 720 }
-    }
-  };
+    },
+    audio: false
+  });
 
-  const stream = await navigator.mediaDevices.getUserMedia(constraints);
   previewStream = stream;
-
-  const videoElement = document.createElement("video");
-  videoElement.srcObject = stream;
-  videoElement.autoplay = true;
-  videoElement.muted = true;
-  videoElement.playsInline = true;
-
-  videoElement.setAttribute("playsinline", "");
-  videoElement.setAttribute("webkit-playsinline", "");
-
-  container.appendChild(videoElement);
-
-  try {
-    await videoElement.play();
-  } catch (e) {
-    console.warn("Preview video play warning:", e);
-  }
-
-  return stream;
+  cameraPreview.srcObject = stream;
+  cameraPreview.style.display = "block";
+  await cameraPreview.play();
 }
 
-async function initAR() {
-  setStatus("перевірка файлів...");
+function stopCameraPreview() {
+  if (previewStream) {
+    previewStream.getTracks().forEach(track => track.stop());
+    previewStream = null;
+  }
+  cameraPreview.pause();
+  cameraPreview.srcObject = null;
+  cameraPreview.style.display = "none";
+}
 
+async function initMindAR() {
   await checkFile("./targets/marker.mind");
   await checkFile("./kitty.mp4");
-
-  setStatus("створення AR-сцени...");
 
   mindarThree = new MindARThree({
     container: container,
     imageTargetSrc: "./targets/marker.mind",
     uiScanning: false,
     uiLoading: false,
-    uiError: false,
+    uiError: false
   });
 
-  const result = mindarThree;
-  renderer = result.renderer;
-  scene = result.scene;
-  camera = result.camera;
-
+  ({ renderer, scene, camera } = mindarThree);
   anchor = mindarThree.addAnchor(0);
 
   assetVideo = document.createElement("video");
@@ -101,7 +90,7 @@ async function initAR() {
   videoTexture.minFilter = THREE.LinearFilter;
   videoTexture.magFilter = THREE.LinearFilter;
 
-  plane = new THREE.Mesh(
+  const videoPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(1.2, 0.8),
     new THREE.MeshBasicMaterial({
       map: videoTexture,
@@ -109,18 +98,18 @@ async function initAR() {
       transparent: true
     })
   );
-  plane.position.set(0, 0, 0);
-  anchor.group.add(plane);
+  videoPlane.position.set(0, 0, 0);
+  anchor.group.add(videoPlane);
 
   cube = new THREE.Mesh(
-    new THREE.BoxGeometry(0.25, 0.25, 0.25),
+    new THREE.BoxGeometry(0.22, 0.22, 0.22),
     new THREE.MeshBasicMaterial({ color: 0xff0000 })
   );
-  cube.position.set(-0.72, 0, 0);
+  cube.position.set(-0.75, 0, 0);
   anchor.group.add(cube);
 
   sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 32, 32),
+    new THREE.SphereGeometry(0.17, 32, 32),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 })
   );
   sphere.position.set(0, 0.55, 0);
@@ -133,6 +122,8 @@ async function initAR() {
   cone.position.set(0.75, 0, 0);
   anchor.group.add(cone);
 
+  anchor.group.visible = false;
+
   anchor.onTargetFound = async () => {
     setMarkerStatus("знайдено ✅");
     anchor.group.visible = true;
@@ -140,7 +131,7 @@ async function initAR() {
     try {
       await assetVideo.play();
     } catch (e) {
-      console.warn("video.play blocked", e);
+      console.warn("video play blocked", e);
     }
   };
 
@@ -152,24 +143,29 @@ async function initAR() {
   };
 }
 
-async function startAR() {
-  if (started) return;
-
+async function startARFlow() {
   try {
-    startButton.disabled = true;
-    setStatus("ініціалізація...");
-    setMarkerStatus("не знайдено");
+    startBtn.disabled = true;
+    errorText.textContent = "";
+    setStatus("запит доступу до камери...");
 
-    if (!mindarThree) {
-      await initAR();
-    }
+    // 1. Явно открываем камеру
+    await openCameraPreview();
+    setStatus("камера відкрита");
 
-    setStatus("запуск камери...");
+    // 2. Небольшая пауза
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // 3. Останавливаем превью
+    stopCameraPreview();
+
+    // 4. Стартуем MindAR
+    setStatus("запуск AR...");
+    await initMindAR();
     await mindarThree.start();
 
-    started = true;
-    stopButton.disabled = false;
-    setStatus("камера запущена, наведи на marker.png");
+    overlay.classList.add("hidden");
+    setStatus("AR активний, наведи на marker.png");
 
     renderer.setAnimationLoop(() => {
       if (cube) {
@@ -190,28 +186,22 @@ async function startAR() {
     });
   } catch (error) {
     console.error(error);
-    startButton.disabled = false;
-    setStatus(`помилка: ${error.message}`);
+    startBtn.disabled = false;
+
+    const msg = String(error.message || error);
+
+    if (msg.includes("NotAllowedError") || msg.includes("Permission")) {
+      errorText.textContent = "Доступ до камери заборонено браузером.";
+    } else if (msg.includes("marker.mind")) {
+      errorText.textContent = "Файл marker.mind не знайдено у папці targets.";
+    } else if (msg.includes("kitty.mp4")) {
+      errorText.textContent = "Файл kitty.mp4 не знайдено в корені проєкту.";
+    } else {
+      errorText.textContent = "Не вдалося запустити камеру або AR.";
+    }
+
+    setStatus("помилка запуску");
   }
 }
 
-function stopAR() {
-  if (!mindarThree || !started) return;
-
-  mindarThree.stop();
-  renderer.setAnimationLoop(null);
-
-  if (assetVideo) {
-    assetVideo.pause();
-    assetVideo.currentTime = 0;
-  }
-
-  started = false;
-  startButton.disabled = false;
-  stopButton.disabled = true;
-  setStatus("зупинено");
-  setMarkerStatus("не знайдено");
-}
-
-startButton.addEventListener("click", startAR);
-stopButton.addEventListener("click", stopAR);
+startBtn.addEventListener("click", startARFlow);
