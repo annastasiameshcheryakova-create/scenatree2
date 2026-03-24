@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR Scene</title>
+  <title>AR Marker Scene</title>
 
   <style>
     html, body {
@@ -11,49 +11,66 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: Arial, sans-serif;
       background: #000;
+      font-family: Arial, sans-serif;
     }
 
     #container {
+      position: relative;
       width: 100vw;
       height: 100vh;
-      position: relative;
       overflow: hidden;
+      background: #000;
     }
 
-    .panel {
+    #cameraPreview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+      z-index: 1;
+      display: none;
+    }
+
+    .overlay {
       position: fixed;
-      z-index: 30;
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-
-    #topPanel {
-      top: 14px;
-      left: 14px;
-      right: 14px;
-    }
-
-    #controls {
-      position: fixed;
-      bottom: 16px;
-      left: 16px;
-      z-index: 30;
+      inset: 0;
+      z-index: 20;
       display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.75);
+    }
+
+    .card {
+      width: min(92vw, 420px);
+      padding: 24px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.08);
+      color: white;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    }
+
+    .card h1 {
+      margin: 0 0 10px;
+      font-size: 26px;
+    }
+
+    .card p {
+      margin: 0 0 18px;
+      line-height: 1.5;
+      opacity: 0.92;
+      font-size: 15px;
     }
 
     .btn {
       border: none;
       border-radius: 999px;
-      padding: 12px 18px;
-      font-size: 15px;
+      padding: 14px 22px;
+      font-size: 16px;
       color: white;
       cursor: pointer;
       background: linear-gradient(90deg, #00c6ff, #0072ff);
@@ -63,29 +80,55 @@
       opacity: 0.6;
       cursor: not-allowed;
     }
+
+    .top-info {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 30;
+      color: white;
+      background: rgba(0,0,0,0.55);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 360px;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 
   <script type="importmap">
   {
     "imports": {
       "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
       "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
     }
   }
   </script>
 </head>
 <body>
-  <div id="container"></div>
-
-  <div id="topPanel" class="panel">
-    <div><strong>Статус:</strong> <span id="status">очікування запуску</span></div>
-    <div><strong>Маркер:</strong> <span id="markerStatus">не знайдено</span></div>
-    <div><strong>Порада:</strong> тримай marker.png окремо на іншому екрані або роздрукованим, не показуй ту саму сторінку самій собі.</div>
+  <div id="container">
+    <video id="cameraPreview" autoplay muted playsinline></video>
   </div>
 
-  <div id="controls">
-    <button id="startButton" class="btn">Запустити AR</button>
-    <button id="stopButton" class="btn" disabled>Stop</button>
+  <div id="overlay" class="overlay">
+    <div class="card">
+      <h1>Запуск AR</h1>
+      <p>
+        Натисни кнопку, дозволь доступ до камери, а потім наведи камеру на свій маркер-котика.
+      </p>
+      <button id="startBtn" class="btn">Увімкнути камеру та AR</button>
+      <p id="errorText" style="margin-top:12px; min-height:20px;"></p>
+    </div>
+  </div>
+
+  <div class="top-info">
+    <div><strong>Статус:</strong> <span id="status">очікування</span></div>
+    <div><strong>Маркер:</strong> <span id="markerStatus">не знайдено</span></div>
   </div>
 
   <script type="module" src="main.js"></script>
